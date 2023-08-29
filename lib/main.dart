@@ -3,6 +3,7 @@ import 'package:flutter_application_1/intro_screen.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(MyApp());
 }
 

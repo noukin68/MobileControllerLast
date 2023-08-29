@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'dart:math';
 
 class TimerScreen extends StatefulWidget {
   final IO.Socket socket;
 
-  const TimerScreen({super.key, required this.socket});
+  TimerScreen(this.socket);
 
   @override
   // ignore: library_private_types_in_public_api
@@ -38,6 +40,14 @@ class _TimerScreenState extends State<TimerScreen>
         curve: Curves.easeInOut,
       ),
     );
+
+    widget.socket.on(
+      'restart-timer',
+      (data) {
+        restartTimer();
+      },
+    );
+
     widget.socket.on(
       'test-completed',
       (data) {
@@ -85,6 +95,12 @@ class _TimerScreenState extends State<TimerScreen>
     );
   }
 
+  void restartTimer() {
+    setState(() {
+      sendTimeToServer();
+    });
+  }
+
   Future<void> onContinuePressed() async {
     widget.socket.emit('continue-work');
     Navigator.pop(context);
@@ -130,6 +146,15 @@ class _TimerScreenState extends State<TimerScreen>
         title: const Text('Лимит времени'),
         backgroundColor: const Color.fromRGBO(119, 75, 36, 1),
         foregroundColor: const Color.fromRGBO(239, 206, 173, 1),
+        actions: [
+          IconButton(
+            icon: Icon(
+              Icons.exit_to_app,
+              color: const Color.fromRGBO(239, 206, 173, 1),
+            ),
+            onPressed: () => logout(),
+          ),
+        ],
       ),
       body: Container(
         color: const Color(0xFFEFCEAD),
@@ -269,6 +294,15 @@ class _TimerScreenState extends State<TimerScreen>
     final int seconds = totalSeconds % 60;
     return '${hours.toString().padLeft(2, '0')} : ${minutes.toString().padLeft(2, '0')} : ${seconds.toString().padLeft(2, '0')}';
   }
+
+  void logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLoggedIn', false); // Сброс информации о входе
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => LoginPage(widget.socket)),
+    );
+  }
 }
 
 class NumberPicker extends StatefulWidget {
@@ -291,6 +325,26 @@ class NumberPicker extends StatefulWidget {
 class _NumberPickerState extends State<NumberPicker> {
   int value = 0;
 
+  void increment() {
+    setState(() {
+      value = (value + 1) % (widget.maxValue + 1);
+      if (value < widget.minValue) {
+        value = widget.minValue;
+      }
+      widget.onChanged(value);
+    });
+  }
+
+  void decrement() {
+    setState(() {
+      value = (value - 1) % (widget.maxValue + 1);
+      if (value < widget.minValue) {
+        value = widget.maxValue;
+      }
+      widget.onChanged(value);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -300,35 +354,59 @@ class _NumberPickerState extends State<NumberPicker> {
               fontSize: 16,
               color: Color.fromRGBO(119, 75, 36, 1),
             )),
-        GestureDetector(
-          onHorizontalDragUpdate: (details) {
-            setState(() {
-              value = (value + (details.primaryDelta! > 0 ? 1 : -1)) %
-                  (widget.maxValue + 1);
-              if (value < widget.minValue) {
-                value = widget.maxValue;
-              }
-              widget.onChanged(value);
-            });
-          },
-          child: Container(
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: const Color.fromRGBO(119, 75, 36, 1),
-              ),
-              borderRadius: BorderRadius.circular(8),
+        Container(
+          margin: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: const Color.fromRGBO(119, 75, 36, 1),
             ),
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-            child: Text(
-              value.toString().padLeft(2, '0'),
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color.fromRGBO(119, 75, 36, 1),
-              ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            value.toString().padLeft(2, '0'),
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Color.fromRGBO(119, 75, 36, 1),
             ),
           ),
         ),
+        Container(
+          padding: EdgeInsets.all(10),
+          child: Row(
+            children: [
+              Container(
+                margin: EdgeInsets.only(right: 2),
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: Size(40, 40),
+                    padding: EdgeInsets.all(4),
+                    textStyle: TextStyle(fontSize: 12),
+                    backgroundColor: Color.fromRGBO(119, 75, 36, 1),
+                    foregroundColor: Color.fromRGBO(239, 206, 173, 1),
+                  ),
+                  onPressed: increment,
+                  child: Text('+'),
+                ),
+              ),
+              Container(
+                margin: EdgeInsets.only(left: 2),
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: Size(40, 40),
+                    padding: EdgeInsets.all(4),
+                    textStyle: TextStyle(fontSize: 12),
+                    backgroundColor: Color.fromRGBO(119, 75, 36, 1),
+                    foregroundColor: Color.fromRGBO(239, 206, 173, 1),
+                  ),
+                  onPressed: decrement,
+                  child: Text('-'),
+                ),
+              ),
+            ],
+          ),
+        )
       ],
     );
   }

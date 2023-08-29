@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/timer_screen.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 class LoginPage extends StatefulWidget {
@@ -16,6 +17,14 @@ class _LoginPageState extends State<LoginPage> {
   TextEditingController uidController = TextEditingController();
   String uid = "";
   String message = "";
+  bool shouldShowLogin = false;
+
+  @override
+  void initState() {
+    super.initState();
+    shouldShowLogin = true;
+    checkLoggedInStatus(); // Проверка информации о входе
+  }
 
   Future<void> authenticate() async {
     final response = await http.post(
@@ -25,10 +34,12 @@ class _LoginPageState extends State<LoginPage> {
     );
 
     if (response.statusCode == 200) {
-      Navigator.pushReplacement(
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isLoggedIn', true); // Сохранение информации о входе
+      Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(
-            builder: (context) => TimerScreen(socket: widget.socket)),
+        MaterialPageRoute(builder: (context) => TimerScreen(widget.socket)),
+        (Route<dynamic> route) => false,
       );
     } else if (response.statusCode == 401) {
       setState(() {
@@ -36,7 +47,7 @@ class _LoginPageState extends State<LoginPage> {
       });
     } else {
       setState(() {
-        message = 'Ошибка сервера';
+        message = 'Введите UID';
       });
     }
   }
@@ -162,5 +173,29 @@ class _LoginPageState extends State<LoginPage> {
         ),
       ),
     );
+  }
+
+  void checkLoggedInStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+
+    if (isLoggedIn) {
+      if (mounted) {
+        setState(() {
+          shouldShowLogin = false; // Скрыть страницу авторизации
+        });
+      }
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => TimerScreen(widget.socket)),
+      );
+    } else {
+      if (mounted) {
+        setState(() {
+          shouldShowLogin = true; // Показать страницу авторизации
+        });
+      }
+    }
+    (Route<dynamic> route) => false;
   }
 }
