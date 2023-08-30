@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:http/http.dart' as http;
 import 'dart:math';
 
 class TimerScreen extends StatefulWidget {
@@ -21,6 +23,7 @@ class _TimerScreenState extends State<TimerScreen>
   int minutes = 0;
   int seconds = 0;
   bool isCountingDown = false;
+  bool isAppRunning = false;
 
   late AnimationController _buttonAnimationController;
   late Animation<double> _buttonScaleAnimation;
@@ -28,6 +31,8 @@ class _TimerScreenState extends State<TimerScreen>
   @override
   void initState() {
     super.initState();
+    fetchAppStatus();
+    Timer.periodic(Duration(seconds: 5), (_) => fetchAppStatus());
 
     _buttonAnimationController = AnimationController(
       vsync: this,
@@ -139,6 +144,17 @@ class _TimerScreenState extends State<TimerScreen>
     return totalSeconds;
   }
 
+  Future<void> fetchAppStatus() async {
+    final response =
+        await http.get(Uri.parse('http://62.217.182.138:3000/appStatus'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      setState(() {
+        isAppRunning = data['isAppRunning'];
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -164,6 +180,17 @@ class _TimerScreenState extends State<TimerScreen>
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              Center(
+                child: Text(
+                  isAppRunning
+                      ? 'Приложение на компьютере активно'
+                      : 'Приложение на компьютере не активно',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Color.fromRGBO(119, 75, 36, 1),
+                  ),
+                ),
+              ),
               Container(
                 width: 200,
                 height: 200,
@@ -192,40 +219,48 @@ class _TimerScreenState extends State<TimerScreen>
                 ),
               ),
               const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  NumberPicker(
-                    title: 'Часы',
-                    minValue: 0,
-                    maxValue: 23,
-                    onChanged: (value) {
-                      setState(() {
-                        hours = value;
-                      });
-                    },
-                  ),
-                  NumberPicker(
-                    title: 'Минуты',
-                    minValue: 0,
-                    maxValue: 59,
-                    onChanged: (value) {
-                      setState(() {
-                        minutes = value;
-                      });
-                    },
-                  ),
-                  NumberPicker(
-                    title: 'Секунды',
-                    minValue: 0,
-                    maxValue: 59,
-                    onChanged: (value) {
-                      setState(() {
-                        seconds = value;
-                      });
-                    },
-                  ),
-                ],
+              Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: NumberPicker(
+                        title: 'Часы',
+                        minValue: 0,
+                        maxValue: 23,
+                        onChanged: (value) {
+                          setState(() {
+                            hours = value;
+                          });
+                        },
+                      ),
+                    ),
+                    Expanded(
+                      child: NumberPicker(
+                        title: 'Минуты',
+                        minValue: 0,
+                        maxValue: 59,
+                        onChanged: (value) {
+                          setState(() {
+                            minutes = value;
+                          });
+                        },
+                      ),
+                    ),
+                    Expanded(
+                      child: NumberPicker(
+                        title: 'Секунды',
+                        minValue: 0,
+                        maxValue: 59,
+                        onChanged: (value) {
+                          setState(() {
+                            seconds = value;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 20),
               AnimatedBuilder(
@@ -286,6 +321,7 @@ class _TimerScreenState extends State<TimerScreen>
   void dispose() {
     _buttonAnimationController.dispose();
     super.dispose();
+    widget.socket.dispose();
   }
 
   String formatTime(int totalSeconds) {
@@ -355,8 +391,8 @@ class _NumberPickerState extends State<NumberPicker> {
               color: Color.fromRGBO(119, 75, 36, 1),
             )),
         Container(
-          margin: const EdgeInsets.symmetric(vertical: 10),
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+          padding: const EdgeInsets.symmetric(
+              vertical: 10, horizontal: 21), // Изменили margin на padding
           decoration: BoxDecoration(
             border: Border.all(
               color: const Color.fromRGBO(119, 75, 36, 1),
@@ -372,41 +408,44 @@ class _NumberPickerState extends State<NumberPicker> {
             ),
           ),
         ),
-        Container(
-          padding: EdgeInsets.all(10),
-          child: Row(
-            children: [
-              Container(
-                margin: EdgeInsets.only(right: 2),
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: Size(40, 40),
-                    padding: EdgeInsets.all(4),
-                    textStyle: TextStyle(fontSize: 12),
-                    backgroundColor: Color.fromRGBO(119, 75, 36, 1),
-                    foregroundColor: Color.fromRGBO(239, 206, 173, 1),
+        Center(
+          child: Container(
+            padding: EdgeInsets.all(10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  margin: EdgeInsets.symmetric(horizontal: 2),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: Size(40, 40),
+                      padding: EdgeInsets.all(4),
+                      textStyle: TextStyle(fontSize: 12),
+                      backgroundColor: Color.fromRGBO(119, 75, 36, 1),
+                      foregroundColor: Color.fromRGBO(239, 206, 173, 1),
+                    ),
+                    onPressed: increment,
+                    child: Text('+'),
                   ),
-                  onPressed: increment,
-                  child: Text('+'),
                 ),
-              ),
-              Container(
-                margin: EdgeInsets.only(left: 2),
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: Size(40, 40),
-                    padding: EdgeInsets.all(4),
-                    textStyle: TextStyle(fontSize: 12),
-                    backgroundColor: Color.fromRGBO(119, 75, 36, 1),
-                    foregroundColor: Color.fromRGBO(239, 206, 173, 1),
+                Container(
+                  margin: EdgeInsets.symmetric(horizontal: 2),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: Size(40, 40),
+                      padding: EdgeInsets.all(4),
+                      textStyle: TextStyle(fontSize: 12),
+                      backgroundColor: Color.fromRGBO(119, 75, 36, 1),
+                      foregroundColor: Color.fromRGBO(239, 206, 173, 1),
+                    ),
+                    onPressed: decrement,
+                    child: Text('-'),
                   ),
-                  onPressed: decrement,
-                  child: Text('-'),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        )
+        ),
       ],
     );
   }
